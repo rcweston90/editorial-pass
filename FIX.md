@@ -1,0 +1,19 @@
+Editorial Pass reviewer bugs. Implement in /workspace/editorial-pass. Vite+React+TS. Keep paper desk (Newsreader, Source Sans 3). Do not start from scratch. Do not ship a single HTML file. No CloudAgent. No git init. No Solara/Arca/wealthtech. No MUI/Tailwind/Inter. npm run build MUST succeed (tsc -b && vite build). erasableSyntaxOnly, noUnusedLocals, noUnusedParameters, verbatimModuleSyntax. When done print SUCCESS then deploy with /home/box/.local/bin/vercel --yes --prod --scope rcweston90s-projects. Never solarawealth.
+
+Works already: paper look, compare on a pasted non-example (2 marks), take/leave, inspect, keyboard, persistence, TYPE/TRACK filters.
+
+Ship in this ORDER:
+
+1. BLOCKING: Run pass on a single draft produced 0 marks. localPass only fires on a tiny phrase list so ordinary prose yields nothing. Fix localPass so a typical 400-800 word draft with no hedges and no ## still gets 4-10 real marks. Real editor only: delete/compress/tighten existing prose, never invent sentences, never fake Claude said. Add heuristics: long grafs over ~80 words compressed (keep first+last or densest two, Track Cut); consecutive short stall grafs compressed; throat-clearing openers (In this piece, I want to talk about, The point of this essay, What I want to say, This is a story about) Voice cut/rewrite; workshop second-person (you might think, as you can see, needless to say, it goes without saying) Skeptic; repeat Jaccard 0.38; if still 0 marks force at least 2 (longest graf compressed, weakest interior cut) with honest reasons. Cap 12. Never silently show 0.
+
+2. GitHub split/unified/inline on paper (steal mechanics not chrome). View switch next to Original/Edited in italic text: Unified = current spine with inline marks (default). Split = two paper columns original left / working copy right, marks in the gutter, slip still opens. Files-changed analogue: clicking a stats count (2 cut) jumps to that mark. Optional thin list of changed section labels, serif italic, not a file tree. No purple PR chrome.
+
+3. Export must download a real .md file. Current createObjectURL+a.click is swallowed; Reviewer only got clipboard. Use a true <a download> in the DOM with blob href at click time, or showSaveFilePicker. Clipboard is extra. Notice must not claim downloaded if it did not.
+
+4. Visible drop target. Each blotter field is a drop zone with dashed/washed inset idle text Drop a .md, stronger on drag-over. Accept .md / text/markdown / text/plain. Two files = original then edited.
+
+5. Flow nodes are arrivals, not a ## parse. A heading-less draft must NOT collapse to one Opening node. When no ##, arrive at beats from blank-line groups of 2-5 grafs; bold/short/question grafs can start a beat; labels are first distinctive phrase, unique ids. Example essay with real ## must still use those headings. FlowView must have multiple nodes on a heading-less paste.
+
+Keep: The Most Finished One default + five marks, keyboard j/k/Enter/Esc/a/r/u, filters, persist, compare versions.
+
+Done when: run pass >=4 marks on heading-less ordinary draft; Unified+Split exist; export downloads; drop zone visible; heading-less flow >1 node; build clean; vercel prod printed.
