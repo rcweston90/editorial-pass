@@ -341,3 +341,281 @@ check(
 )
 
 // Four blank-line groups, no headings anywhere: four arrivals, four names.
+const fourBeats = beatsOf(parseMarkdown(
+  [
+    'The team shipped the thing on a Tuesday, and by Thursday nobody could say what it had cost, which is the part of shipping that never makes the retrospective and never stops mattering to the people who paid for it in evenings.',
+    'Estimates are a story told about a future nobody has visited yet, and the story gets better every time it is retold, because the retelling drops whatever was inconvenient about the last one and keeps only the parts that made everybody feel capable.',
+    'What we do now is smaller and duller. We write down the last five things of roughly this size, we look at how long each of them actually took from first commit to the day it stopped needing attention, and we say the range out loud.',
+    'Nobody enjoys the range. The range is wide, and a wide range reads as a lack of confidence rather than as an honest account of a process that has never once been narrow, and so the meeting always wants a single number instead.',
+  ].join('\n\n'),
+))
+console.log(`      ${fourBeats.map((b) => b.short).join(' · ')}`)
+check('four groups, four arrivals', fourBeats.length === 4, String(fourBeats.length))
+check('  each with its own name', new Set(fourBeats.map((b) => b.short)).size === 4)
+
+// One heading over a whole draft is a title, not a structure.
+const titled = beatsOf(parseMarkdown(`## On documents\n\n${plainDraft}`))
+check('a single heading does not collapse the draft', titled.length >= 4, String(titled.length))
+check('  and the heading still names its first beat', titled[0].title === 'On documents', titled[0].title)
+const plainFlow = buildRender(plainDoc, plainMarks, {}, all).flow
+check('flow draws every beat', plainFlow.length === plainBeats.length, String(plainFlow.length))
+check('marked beats carry their mark', plainFlow.some((f) => f.changeId !== null))
+check('flow weights fall where the pass cut', plainFlow.some((f) => f.editWeight < f.origWeight))
+
+console.log('\n— split: two columns, and a section change does not eat the original —')
+const splitRows = buildSplit(render.sections, {})
+const wholeRow = splitRows.find((r) => r.kind === 'change' && r.whole)
+check('the whole-section cut is one row', wholeRow !== undefined)
+if (wholeRow && wholeRow.kind === 'change') {
+  const left = wholeRow.left.map((b) => plainOf(b.content)).join(' ')
+  check('  the original still stands on the left', left.includes('Design got hired'), left.slice(0, 60))
+  check('  the working copy has nothing there', wholeRow.right === null)
+}
+const headingRow = splitRows.find((r) => r.kind === 'heading' && r.gone)
+check('its heading is struck on the right', headingRow !== undefined)
+const rewriteRow = splitRows.find((r) => r.kind === 'change' && r.changeId === goldRewrite.id)
+if (rewriteRow && rewriteRow.kind === 'change') {
+  check('rewrite rows carry both versions', rewriteRow.right !== null)
+  check('  the delta marks the dropped words', rewriteRow.left.some((b) => b.flags.some(Boolean)))
+  check('  and marks nothing that did not move', rewriteRow.left[0].flags.filter(Boolean).length < rewriteRow.left[0].flags.length)
+  check('  flags line up with the words', rewriteRow.left.every((b) => b.flags.length === plainOf(b.content).split(/\s+/).filter(Boolean).length))
+}
+const kept = splitRows.filter((r) => r.kind === 'kept')
+check('untouched prose is in both columns', kept.length > 10, String(kept.length))
+check('a cut you kept mine on stands in the working copy', (() => {
+  const rows = buildSplit(
+    buildRender(doc, marks, { [goldWhole.id]: 'rejected' }, all).sections,
+    { [goldWhole.id]: 'rejected' },
+  )
+  const row = rows.find((r) => r.kind === 'change' && r.whole)
+  return row !== undefined && row.kind === 'change' && row.right !== null
+})())
+const changedList = changedBeats(marks, render.whereOfMark)
+check('changed list names the touched beats', changedList.length === 5, changedList.map((c) => c.label).join(' · '))
+const plainRender = buildRender(plainDoc, plainMarks, {}, all)
+const plainChanged = changedBeats(plainMarks, plainRender.whereOfMark)
+check(
+  'a heading-less draft gets beat names, not five Openings',
+  plainChanged.length > 1 && plainChanged.every((c) => c.label !== 'Opening'),
+  plainChanged.map((c) => c.label).join(' · '),
+)
+check(
+  '  and every mark carries the same name in the margin',
+  plainMarks.every((m) => (plainRender.whereOfMark.get(m.id) ?? 'Opening') !== 'Opening'),
+  [...plainRender.whereOfMark.values()].join(' · '),
+)
+
+console.log('\n— a draft with no # does not grow one —')
+check('title is borrowed', plainDoc.derivedTitle === true)
+check('export writes no heading', !exportMarkdown(plainDoc, [], {}).startsWith('#'))
+check('the essay still round-trips', exportMarkdown(plainDoc, [], {}).trim() === plainDraft.trim())
+check('a titled draft keeps its heading', documentToMarkdown(doc).startsWith('# The Most Finished One'))
+
+console.log('\n— word delta —')
+const d = wordDelta('the cat sat on the mat', 'the cat sat on the hat')
+check('one word out, one in', d.droppedWords === 1 && d.addedWords === 1, `${d.dropped.join('|')} / ${d.added.join('|')}`)
+check('flags are per word', d.aFlags.length === 6 && d.bFlags.length === 6)
+check('only the changed word is flagged', d.aFlags.filter(Boolean).length === 1 && d.aFlags[5])
+
+console.log('\n— screen one renders: cold —')
+try {
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const { createElement } = await import('react')
+  const App = (await import('../src/App')).default
+  const { EssaySheet } = await import('../src/components/EssaySheet')
+  const { SplitSheet } = await import('../src/components/SplitSheet')
+  const { BeatsSheet } = await import('../src/components/BeatsSheet')
+  const noop = () => undefined
+  const html = renderToStaticMarkup(createElement(App))
+
+  const tabs = [...html.matchAll(/class="screen-name">([^<]+)</g)].map((m) => m[1])
+  check('four screens in the chrome, in order',
+    tabs.join(' · ') === 'Draft · Marks · Original vs this pass · Beats', tabs.join(' · '))
+  check('a refresh lands on screen one', /id="screen-draft"[^>]*aria-current="page"/.test(html))
+  check('  and only one screen is current', (html.match(/aria-current="page"/g) ?? []).length === 1)
+  check('the other three wait for a pass',
+    (html.match(/class="screen-tab"[^>]*disabled/g) ?? []).length === 3,
+    String((html.match(/class="screen-tab"[^>]*disabled/g) ?? []).length))
+  check('screen one is paper', html.includes('class="sheet draft-sheet"'))
+  check('the paper is blank', html.includes('Nothing on the paper yet'))
+  check('no marks on a cold load', (html.match(/class="mark-btn/g) ?? []).length === 0)
+  check('the example is not loaded', !html.includes('The Most Finished One'))
+  check('no sample stamp', !html.includes('class="stamp"'))
+  check('the draft box is the paper', html.includes('class="ms-field ms-original"'))
+  check('the compare box is the sidebar, and only that', html.includes('class="blotter-side"') &&
+    html.split('class="blotter-side"')[1].split('</aside>')[0].includes('ms-field ms-edited') &&
+    !html.split('class="blotter-side"')[1].split('</aside>')[0].includes('ms-original'))
+  check('both boxes are empty', (html.match(/<textarea[^>]*><\/textarea>/g) ?? []).length === 2,
+    String((html.match(/<textarea/g) ?? []).length))
+  check('load example is on the desk', html.includes('Load example'))
+  check('the first instruction is paste, then Run pass',
+    html.includes('Paste a draft here, then Run pass.'))
+  check('nothing to start over from yet', !html.includes('id="start-over"'))
+  check('no stats bar over blank paper', !html.includes('class="stats'))
+  check('chrome kicker', html.includes('Editorial pass'))
+  check('Export is always on the desk', html.includes('id="export-btn"'))
+  check('export writes through a real anchor', html.includes('class="export-anchor"'))
+
+  // The drawers the screens replaced. None of them come back.
+  check('no mode row', !html.includes('id="btn-split"') && !html.includes('class="read-toggle"'))
+  check('no Flow chrome', !html.includes('id="flow-toggle"') && !html.includes('id="flow-grid"') &&
+    !html.includes('class="flow'))
+  check('no Draft drawer toggle', !html.includes('id="draft-toggle"'))
+  check('no About, no tour', !html.includes('data-about') && !html.includes('class="about'))
+  check('no glossary page', !html.includes('glossary'))
+  check('no Take, no Leave', !html.includes('>Take<') && !html.includes('>Leave<') &&
+    !html.includes('Take all') && !html.includes('Leave all'))
+
+  console.log('\n— screen one renders: a cold load over an old store —')
+  const seeded = new Map<string, string>()
+  ;(globalThis as unknown as { localStorage: Storage }).localStorage = {
+    getItem: (k: string) => seeded.get(k) ?? null,
+    setItem: (k: string, v: string) => void seeded.set(k, v),
+    removeItem: (k: string) => void seeded.delete(k),
+    clear: () => seeded.clear(),
+    key: (i: number) => [...seeded.keys()][i] ?? null,
+    get length() {
+      return seeded.size
+    },
+  } as Storage
+  /* Everything a desk that shipped before this one could have left lying about:
+     an old blob and a fresh one, both holding the sample. First paint owes them
+     nothing — it is empty paper, and the way in is paste a draft, then Run pass. */
+  seeded.set('editorial-pass:v2', JSON.stringify({ v: 2, ...exampleSession() }))
+  seeded.set('editorial-pass:v3', JSON.stringify({ v: 3, ...exampleSession() }))
+  const overOld = renderToStaticMarkup(createElement(App))
+  check('a leftover example does not paint', !overOld.includes('The Most Finished One'))
+  check('  the paper is empty instead', overOld.includes('Nothing on the paper yet'))
+  check('  and it asks for a draft', overOld.includes('Paste a draft here, then Run pass.'))
+  check('  no sample stamp on a cold load', !overOld.includes('class="stamp"'))
+  check('  still screen one', /id="screen-draft"[^>]*aria-current="page"/.test(overOld))
+  check('  nothing to start over from yet', !overOld.includes('id="start-over"'))
+  check('  and the old blob is dropped, not kept', !seeded.has('editorial-pass:v2'))
+
+  console.log('\n— screen one renders: a draft you pasted, marked —')
+  seeded.clear()
+  saveSession({
+    ...cold,
+    originalMd: plainDraft,
+    docMd: plainDraft,
+    document: plainDoc,
+    layers: [{ id: 'pass-1', label: 'Local pass', source: 'local' as const, marks: plainMarks }],
+    activeLayerId: 'pass-1',
+    title: plainDoc.title,
+  })
+  const warm = renderToStaticMarkup(createElement(App))
+  check('a refresh still shows screens, not one long blotter',
+    /id="screen-draft"[^>]*aria-current="page"/.test(warm) && warm.includes('class="sheet draft-sheet"'))
+  check('the pass opens the other three screens',
+    (warm.match(/class="screen-tab"[^>]*disabled/g) ?? []).length === 0,
+    String((warm.match(/class="screen-tab"[^>]*disabled/g) ?? []).length))
+  check('the draft came back in the box', warm.includes(plainDraft.slice(0, 40)))
+  check('no sample stamp over a draft of your own', !warm.includes('class="stamp"'))
+  check('the marks are not dumped under the draft box',
+    (warm.match(/class="mark-btn/g) ?? []).length === 0)
+  check('no stats bar on screen one', !warm.includes('class="stats'))
+  // The way home is one desk action, on the paper you arrive on.
+  check('Start over is on the paper', warm.includes('id="start-over"'))
+  check('  one of it, not a settings page', (warm.match(/id="start-over"/g) ?? []).length === 1)
+  seeded.clear()
+
+  /* Screens two, three and four, drawn from the same render model the app hands
+     them. The app itself always opens on screen one, so these are rendered
+     directly rather than clicked into. */
+  const warmRender = buildRender(plainDoc, plainMarks, {}, all)
+  const paper = {
+    marks: new Map(plainMarks.map((m) => [m.id, m])),
+    markCount: plainMarks.length,
+    openId: null,
+    focusedId: null,
+    where: warmRender.whereOfMark,
+    onToggle: noop,
+    onDecide: noop,
+    onCloseSlip: noop,
+    onboard: false,
+    sample: false,
+    onDraft: noop,
+    onExport: noop,
+    registerHost: noop,
+    registerAnchor: noop,
+  }
+  const docHead = { title: plainDoc.title, derivedTitle: plainDoc.derivedTitle,
+    byline: plainDoc.byline, epigraph: plainDoc.epigraph }
+
+  console.log('\n— screen two: the marks —')
+  const two = renderToStaticMarkup(createElement(EssaySheet, {
+    ...paper, head: docHead, sections: warmRender.sections, decisions: {},
+    mode: 'original' as const, onMode: noop,
+  }))
+  check('a mark in the margin for every mark',
+    (two.match(/class="mark-btn/g) ?? []).length === plainMarks.length,
+    String((two.match(/class="mark-btn/g) ?? []).length))
+  check('two decisions on every mark',
+    (two.match(/class="mark-act"/g) ?? []).length === plainMarks.length * 2)
+  check('  Keep this keeps this delta on the working copy',
+    two.includes('>Keep this</button>') && two.includes('title="Keep this delta on the working copy"'))
+  check('  Keep mine keeps the original for that mark',
+    two.includes('>Keep mine</button>') && two.includes('title="Keep the original for this mark"'))
+  check('  and Take and Leave are gone from the mark',
+    !two.includes('>Take</button>') && !two.includes('>Leave</button>'))
+  check('the original is still there under the marks', two.includes('class="essay"'))
+  check('the reading toggle is on the paper, not in the chrome',
+    two.includes('class="reading"') && two.includes('id="btn-orig"') && two.includes('id="btn-edit"'))
+  // Type and Track are named where they are used, and nowhere else.
+  check('the mark says Type beside what the pass did',
+    /class="lbl"><span class="mark-term">Type<\/span> (Cut|Compressed|Rewritten)</.test(two))
+  check('  and Track beside which pass wrote it',
+    (two.match(/class="lbl trk"><span class="mark-term">Track<\/span> (Voice|Skeptic|Cut|HN)</g) ?? [])
+      .length === plainMarks.length)
+  check('no About on the paper', !two.includes('data-about'))
+  check('the keyhint speaks the decisions the marks speak',
+    two.includes('a keep this · r keep mine'))
+
+  console.log('\n— screen three: original vs this pass —')
+  const three = renderToStaticMarkup(createElement(SplitSheet, {
+    ...paper, head: docHead,
+    rows: buildSplit(warmRender.sections, {}),
+    changed: changedBeats(plainMarks, warmRender.whereOfMark),
+  }))
+  check('the original is the spine', three.includes('<div class="split-lab">Original</div>'))
+  check('this pass is the Edited column',
+    three.includes('<div class="split-lab split-lab-right">Edited</div>'))
+  check('  and it is not called the working copy', !three.includes('>Working copy<'))
+  check('a mark in the gutter for every mark',
+    (three.match(/class="mark-btn/g) ?? []).length === plainMarks.length)
+  check('the changed strip names beats, not five Openings',
+    three.includes('class="split-changed"') && !three.includes('>Opening</button>'))
+  check('no About on the split', !three.includes('data-about'))
+
+  console.log('\n— screen four: beats —')
+  const four = renderToStaticMarkup(createElement(BeatsSheet, {
+    beats: warmRender.flow,
+    typeOf: (id: string | null) => (id ? plainMarks.find((m) => m.id === id)?.type ?? null : null),
+    activeSection: null,
+    onJump: noop,
+    markCount: plainMarks.length,
+    sample: false,
+  }))
+  const beatNames = [...four.matchAll(/class="txt">([^<]+)</g)].map((m) => m[1])
+  check('one row per beat',
+    (four.match(/class="beat-row"/g) ?? []).length === warmRender.flow.length,
+    String((four.match(/class="beat-row"/g) ?? []).length))
+  check('  more than one beat: it does not collapse',
+    warmRender.flow.length > 1, String(warmRender.flow.length))
+  check('  and not one of them is called Opening',
+    beatNames.every((n) => n !== 'Opening'), beatNames.join(' · '))
+  check('  every beat is named after its own prose',
+    beatNames.length === warmRender.flow.length && new Set(beatNames).size === beatNames.length)
+  check('each beat draws what the pass left of it',
+    (four.match(/class="beat-bar"/g) ?? []).length === warmRender.flow.length)
+  check('no Flow chrome on it',
+    !four.includes('class="flow') && !four.includes('id="flow-grid"') &&
+    !four.includes('class="lane') && !four.includes('Flow'))
+  check('the screen says what the drawing means, once',
+    (four.match(/class="beats-hint"/g) ?? []).length === 1)
+} catch (err) {
+  check('renders without throwing', false, String(err))
+}
+
+console.log(`\n${failures === 0 ? 'ALL GREEN' : `${failures} FAILING`}\n`)
+ if (failures > 0) process.exitCode = 1
