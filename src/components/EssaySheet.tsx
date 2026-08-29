@@ -26,22 +26,32 @@ export interface SheetProps {
   decisions: Record<string, Decision>
   markCount: number
   mode: Mode
+  /** Which version the spine reads in. The marks stand in both. */
   onMode: (mode: Mode) => void
   openId: string | null
   focusedId: string | null
+  /** Mark id → the beat it sits in, so every label for it agrees. */
   where: Map<string, string>
   onToggle: (id: string) => void
   onDecide: (id: string, decision: Decision) => void
   onCloseSlip: () => void
+  /** Still reading the example: say where a draft of your own goes. */
   onboard: boolean
+  /** The paper is the shipped sample, and says so in the corner. */
   sample: boolean
+  /** No draft at all. The paper asks for one instead of pretending to be one. */
   empty?: boolean
+  /** The way to screen one, where a draft goes on. */
   onDraft: () => void
+  /** What the desk last said. It stands on the paper when the blotter is shut. */
   notice?: string | null
+  /** The same word, when the tap that earned it was down in the footer. */
   footNote?: string | null
   onDismissNotice?: () => void
+  /** Export, tapped from the footer: the answer comes back to the footer. */
   onExport?: () => void
   registerHost: Register
+  /** Sections and paragraphs both register here; the flow scrolls to them. */
   registerAnchor: Register
 }
 
@@ -54,6 +64,10 @@ function hostClass(base: string, open: boolean, focused: boolean, decision: Deci
   return cls.join(' ')
 }
 
+/**
+ * The marked passage itself is a target, in both versions: in the edited
+ * reading the scar rule is all that is left of a cut, so it stays clickable.
+ */
 function passageProps(id: string, onToggle: (id: string) => void) {
   return {
     onClick: (e: MouseEvent) => {
@@ -67,10 +81,12 @@ function decisionOf(props: SheetProps, id: string): Decision {
   return props.decisions[id] ?? 'pending'
 }
 
+/** A mark is somewhere: the beat it landed in, named the way the flow names it. */
 function whereFor(props: SheetProps, id: string, fallback: string): string {
   return props.where.get(id) ?? props.marks.get(id)?.sectionTitle ?? fallback
 }
 
+/** Which pass wrote this mark. It is named on the mark, never in a legend. */
 function trackFor(props: SheetProps, id: string): Track {
   return props.marks.get(id)?.track ?? 'Cut'
 }
@@ -183,6 +199,7 @@ function Node({ node, props }: { node: EssayNode; props: SheetProps }) {
   return <ChangeBlockNode node={node} props={props} />
 }
 
+/** A section the pass removed outright: the section element is the change host. */
 function WholeCutSection({
   section,
   cut,
@@ -239,6 +256,14 @@ function WholeCutSection({
   )
 }
 
+/**
+ * The paper before there is anything on it. It is still paper, and it carries
+ * one next step and nothing else: go to screen one and paste a draft.
+ *
+ * There is exactly one button here on purpose. Screen two is a reading of a
+ * pass, so with no pass to read it says where the pass comes from and gets out
+ * of the way.
+ */
 function EmptyPaper({ onDraft }: { onDraft: () => void }) {
   return (
     <div className="paper-empty">
@@ -256,6 +281,11 @@ function EmptyPaper({ onDraft }: { onDraft: () => void }) {
   )
 }
 
+/**
+ * The one control this screen owns: which version the spine is read in. Both
+ * readings carry the same marks in the margin — the words on the mark are the
+ * same either way, and screen three stands the two of them side by side.
+ */
 function Reading({ mode, onMode }: { mode: Mode; onMode: (mode: Mode) => void }) {
   return (
     <div className="paper-top">
@@ -326,9 +356,13 @@ export function EssaySheet(props: SheetProps) {
             Sample
           </p>
         ) : null}
+        {/* Export, a read draft, a stale one: the desk says so on the paper,
+            because the blotter it used to say it on may well be shut. */}
         {props.notice ? (
           <PaperNote text={props.notice} onDismiss={props.onDismissNotice} />
         ) : null}
+        {/* The sample is on the paper: yours goes on screen one, said here at
+            the top rather than in a footer a whole manuscript away. */}
         {props.onboard ? (
           <p className="paper-yours">
             Reading the sample.{' '}
@@ -338,6 +372,7 @@ export function EssaySheet(props: SheetProps) {
             to replace it.
           </p>
         ) : null}
+        {/* This screen's own control, on the paper, above the manuscript. */}
         {empty ? null : <Reading mode={mode} onMode={props.onMode} />}
         <div className="essay" id="essay">
           <header className="essay-head">
@@ -347,6 +382,9 @@ export function EssaySheet(props: SheetProps) {
                 <InlineText content={head.byline} />
               </p>
             ) : null}
+            {/* The epigraph is kept as the line the draft wrote, so it goes back
+                out byte for byte — but it is read as prose on the way in, or a
+                draft that emphasised it prints its own asterisks at the reader. */}
             {head.epigraph ? (
               <blockquote className="epigraph">
                 <InlineText content={parseInline(head.epigraph)} />
@@ -384,6 +422,9 @@ export function EssaySheet(props: SheetProps) {
             ),
           )}
 
+          {/* Above the rule, not below it: a word added under the last line of
+              the page lands off the bottom of a phone. Here it takes the
+              footer's own place, right beside the tap that asked for it. */}
           {props.footNote ? (
             <PaperNote foot text={props.footNote} onDismiss={props.onDismissNotice} />
           ) : null}
@@ -397,6 +438,8 @@ export function EssaySheet(props: SheetProps) {
                   reading the {mode === 'original' ? 'original' : 'edited'} version.
                 </>
               )}
+              {/* Export at the end of the manuscript, because that is where you
+                  are when you have finished reading it. */}
               {!empty && props.onExport ? (
                 <>
                   {' · '}
