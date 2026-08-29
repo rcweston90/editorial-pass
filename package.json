@@ -1,0 +1,28 @@
+{
+  "name": "editorial-pass",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "smoke": "vite build --ssr scripts/smoke.ts --outDir .smoke --emptyOutDir --logLevel warn && node .smoke/smoke.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.121.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  },
+  "description": "Editorial pass — paste a draft, get a marked pass, accept or reject, export"
+}

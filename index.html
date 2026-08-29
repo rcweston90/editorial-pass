@@ -1,1 +1,19 @@
-<!DOCTYPE html><html lang=en><head><meta charset=utf-8><title>Editorial pass</title></head><body><script src=p0.js></script><script src=p1.js></script><script src=p2.js></script><script src=p3.js></script><script src=p4.js></script><script>(async()=>{const b64=EP0+EP1+EP2+EP3+EP4;const bin=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));const stream=new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'));const text=await new Response(stream).text();document.open();document.write(text);document.close();})();</script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editorial pass</title>
+    <link rel="icon" type="image/svg+xml" href="/mark.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500;1,6..72,600&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body data-mode="original">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
