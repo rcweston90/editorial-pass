@@ -17,10 +17,17 @@ function Group<T extends string>({
   muted,
 }: {
   label: string
+  /**
+   * What this control sorts by, said in the row it sorts. The chips underneath
+   * are the vocabulary — cut/compressed/rewritten, Voice/Skeptic/Cut/HN — and
+   * without the name beside them they read as a row of loose words. There is no
+   * glossary page to send anyone to, so the name lives here.
+   */
   gloss: string
   options: T[]
   value: T | 'all'
   onPick: (v: T | 'all') => void
+  /** Nothing is open yet, so the bar recedes rather than asking to be used. */
   muted: boolean
 }) {
   return (
@@ -75,7 +82,9 @@ export function StatsBar({
   stats: PassStats
   filters: Filters
   onFilters: (f: Filters) => void
+  /** A mark is open. Until one is, the filter bars stay muted. */
   armed: boolean
+  /** Clicking a count walks the marks of that type, GitHub files-changed style. */
   onJumpType: (type: ChangeType) => void
   onKeepAll: () => void
   onKeepMineAll: () => void
@@ -83,13 +92,21 @@ export function StatsBar({
   canUndo: boolean
   shown: number
 }) {
+  /* Narrow, the counts are the bar and everything you can do to the marks is
+     tucked behind one word. Wide, the tools are simply always out and the
+     tuck never appears — same markup, same row, no second layout to keep. */
   const [toolsOpen, setToolsOpen] = useState(false)
   const filtered = filters.type !== 'all' || filters.track !== 'all'
+  /* Filtering is something you reach for once you are in among the marks. With
+     nothing open and nothing filtered, the two bars mute: still there, still
+     tappable, just no longer competing with the mark you have not opened yet. */
   const muted = !armed && !filtered
 
   return (
     <div className={toolsOpen ? 'stats is-tools-open' : 'stats'}>
       <div className="stats-count">
+        {/* The count is of the draft as you have left it, so a mark kept moves
+            it. What the still-open marks would come to is the tail. */}
         <span className="fig">{n(stats.wordsIn)}</span>
         <span className="arrow" aria-hidden="true">
           →
@@ -131,6 +148,7 @@ export function StatsBar({
           </>
         ) : null}
       </div>
+      {/* The tuck: one word at mini, and never rendered wide. */}
       <button
         type="button"
         className="stats-tuck"
@@ -141,6 +159,7 @@ export function StatsBar({
         {toolsOpen ? 'Close' : filtered ? 'Marks · filtered' : 'Marks'}
       </button>
       <div className="stats-tools" id="stats-tools">
+        {/* The same two words the mark and the slip use, in the same order. */}
         <Group<ChangeType>
           label="Type"
           gloss="what the mark did"
@@ -157,6 +176,8 @@ export function StatsBar({
           muted={muted}
           onPick={(track) => onFilters({ ...filters, track })}
         />
+        {/* The same two decisions the mark carries, said over every mark still
+            open. Same words, same order, so the row needs no second reading. */}
         <div className="bulk">
           <button type="button" title={`${KEEP_THIS_WHY}, on every open mark`} onClick={onKeepAll}>
             Keep all
