@@ -16,17 +16,24 @@ export interface Beat {
   title: string
   short: string
   sectionId: string
+  /** Section id for a headed beat, graf id for an arrival beat. */
   anchorId: string
   grafs: Graf[]
 }
 
+/** A beat carries at least this much prose before the next one can start. */
 const MIN_WORDS = 30
+/** No beat runs past this many paragraphs, however short they are. */
 const MAX_GRAFS = 5
+/** Roughly one beat per this much prose, held inside the bounds below. */
 const BEAT_WORDS = 170
 const MIN_BEATS = 4
 const MAX_BEATS = 8
+/** A tail lighter than this trails the beat before it instead of standing alone. */
 const STRAY_WORDS = 22
+/** A paragraph this short is a turn in the prose, not a paragraph. */
 const HINGE_WORDS = 12
+/** Two headings are a structure; one is a title with a draft under it. */
 const HEADED = 2
 
 function hasStrong(graf: Graf): boolean {
@@ -47,6 +54,7 @@ function weigh(grafs: Graf[]): number {
   return n
 }
 
+/** The first distinctive phrase: enough of the opening line to recognise it. */
 function phrase(text: string, max: number): string {
   const clean = text.replace(/\s+/g, ' ').trim().replace(/^["“”'’(]+/, '')
   const first = clean.split(/(?<=[.!?])\s/)[0] ?? clean
@@ -61,6 +69,12 @@ function phrase(text: string, max: number): string {
   return `${out}…`
 }
 
+/**
+ * A headed draft beats out on its headings. The run of prose before the first
+ * one is a beat too, and it is named after the line it opens with — calling it
+ * Opening tells you nothing, and on a draft whose sections are all unheaded it
+ * would name every beat the same word.
+ */
 function sectionBeats(doc: DocumentModel): Beat[] {
   const taken = new Set<string>()
   return doc.sections.map((section) => {
@@ -71,6 +85,8 @@ function sectionBeats(doc: DocumentModel): Beat[] {
       : head
         ? phrase(head.text, 20)
         : 'Untitled beat'
+    // Two beats that read the same in the lane are not two beats you can tell
+    // apart, so the second one takes more of the line it opens with.
     if (taken.has(short.toLowerCase()) && head) short = phrase(head.text, 38)
     taken.add(short.toLowerCase())
     return {
@@ -84,6 +100,12 @@ function sectionBeats(doc: DocumentModel): Beat[] {
   })
 }
 
+/**
+ * Where the beats fall when there are no headings to fall on. The draft is
+ * filled into runs of paragraphs: a run closes once it carries its share of the
+ * prose, at a turn in the writing, or at the paragraph cap — never mid-turn,
+ * and never on a scrap too light to be a beat of its own.
+ */
 function arrivalRuns(grafs: Graf[], opens: Set<string>): Graf[][] {
   const total = weigh(grafs)
   const want = Math.min(MAX_BEATS, Math.max(MIN_BEATS, Math.round(total / BEAT_WORDS)))
@@ -93,6 +115,9 @@ function arrivalRuns(grafs: Graf[], opens: Set<string>): Graf[][] {
   let run: Graf[] = []
   let acc = 0
   for (const graf of grafs) {
+    // Stop at whichever side of the target this paragraph lands nearer to:
+    // filling until the run is over it makes every beat one paragraph too long,
+    // and four paragraphs of even weight have to come out as four beats.
     const w = wordCount(graf.text)
     const heavy = run.length >= MAX_GRAFS || (acc >= MIN_WORDS && acc + w / 2 > target)
     const turn = acc >= MIN_WORDS && isHinge(graf)
@@ -106,6 +131,7 @@ function arrivalRuns(grafs: Graf[], opens: Set<string>): Graf[][] {
   }
   if (run.length) runs.push(run)
 
+  // A stray last paragraph belongs to the beat it trails, not to itself.
   if (runs.length > 1) {
     const tail = runs[runs.length - 1]
     if (weigh(tail) < STRAY_WORDS && !opens.has(tail[0].id)) {
@@ -119,6 +145,8 @@ function arrivalRuns(grafs: Graf[], opens: Set<string>): Graf[][] {
 function arrivalBeats(doc: DocumentModel): Beat[] {
   const grafs: Graf[] = []
   const sectionOf = new Map<string, SectionDoc>()
+  // A heading, where there is one, is an arrival like any other — it just comes
+  // with its own name.
   const opens = new Set<string>()
   for (const section of doc.sections) {
     if (section.grafs[0]) opens.add(section.grafs[0].id)
@@ -136,6 +164,8 @@ function arrivalBeats(doc: DocumentModel): Beat[] {
     const heading = opens.has(head.id) ? section.heading : null
     const title = heading ?? phrase(head.text, 60)
     let short = heading ? section.short ?? shortLabel(heading) : phrase(head.text, 20)
+    // Two beats that open the same way are told apart by more of the sentence,
+    // and only numbered when even that repeats.
     if (taken.has(short.toLowerCase())) short = phrase(head.text, 38)
     if (taken.has(short.toLowerCase())) short = `${short} (${i + 1})`
     taken.add(short.toLowerCase())
@@ -150,6 +180,11 @@ function arrivalBeats(doc: DocumentModel): Beat[] {
   })
 }
 
+/**
+ * Headings when the draft is built on them, arrivals when it is not. One
+ * heading over a whole draft is a title, not a structure, so it beats out with
+ * the prose the same way a headingless draft does.
+ */
 export function beatsOf(doc: DocumentModel): Beat[] {
   const headings = doc.sections.filter((s) => s.heading !== null).length
   if (headings >= HEADED) return sectionBeats(doc)
@@ -158,7 +193,9 @@ export function beatsOf(doc: DocumentModel): Beat[] {
 
 export interface FlowModel {
   flow: FlowSection[]
+  /** Which beat a paragraph landed in, so an open mark can light its beat. */
   beatOfGraf: Map<string, string>
+  /** What to call where a mark is: the beat it sits in, not the section id. */
   whereOfMark: Map<string, string>
 }
 
@@ -184,6 +221,8 @@ export function buildFlow(
   }
 
   const flow = beats.map((beat) => {
+    // The flow measures the whole pass, not the filtered view of it: a lane
+    // that changed length when you flipped a filter would be lying.
     const origWeight = Math.max(1, weigh(beat.grafs))
     const editWeight = grafWordsAfter(beat.grafs, marks, decisions)
     const here = shown.find((m) => beatOfGraf.get(m.grafIds[0]) === beat.id)
