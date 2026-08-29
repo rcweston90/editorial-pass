@@ -24,5 +24,5 @@
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   },
-  "description": "Editorial pass — paste a draft, get a marked pass, accept or reject, export"
+  "description": "Editorial pass \u2014 paste a draft, get a marked pass, accept or reject, export"
 }
