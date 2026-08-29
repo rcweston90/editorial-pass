@@ -17,16 +17,22 @@ export interface SplitProps {
   markCount: number
   openId: string | null
   focusedId: string | null
+  /** Mark id → the beat it sits in: the same name the Changed strip uses. */
   where: Map<string, string>
   onToggle: (id: string) => void
   onDecide: (id: string, decision: Decision) => void
   onCloseSlip: () => void
   onboard: boolean
+  /** The paper is the shipped sample, and says so in the corner. */
   sample: boolean
+  /** The way to screen one, where a draft goes on. */
   onDraft: () => void
+  /** What the desk last said. It stands on the paper when the blotter is shut. */
   notice?: string | null
+  /** The same word, when the tap that earned it was down in the footer. */
   footNote?: string | null
   onDismissNotice?: () => void
+  /** Export, tapped from the footer: the answer comes back to the footer. */
   onExport?: () => void
   registerHost: Register
   registerAnchor: Register
@@ -41,6 +47,13 @@ function cellClass(base: string, open: boolean, focused: boolean, decision: Deci
   return cls.join(' ')
 }
 
+/**
+ * Screen three: your original against this pass. Two paper columns and a
+ * gutter. The left column is the spine and it is always whole — a cut section
+ * is struck through on the right and stands untouched on the left, which is the
+ * only way to read a cut and still see what it cost. The right column is what
+ * this pass makes of it, headed Edited, with your decisions already in it.
+ */
 export function SplitSheet(props: SplitProps) {
   const {
     head,
