@@ -824,3 +824,264 @@ body[data-mode="edited"] .change-block[data-change].is-rejected[data-type] .bloc
   margin: 0; font-family: var(--serif); font-style: italic;
   font-size: 1.02rem; color: var(--muted);
 }
+.beats-list { list-style: none; margin: 0; padding: 0; max-width: var(--col); }
+.beat-row + .beat-row { border-top: 1px solid color-mix(in srgb, var(--rule) 70%, transparent); }
+.beat {
+  appearance: none; background: none; border: 0; cursor: pointer; width: 100%;
+  display: grid; grid-template-columns: 2.1rem minmax(0, 1fr) auto;
+  align-items: baseline; gap: 0.2rem 0.7rem;
+  padding: 0.62rem 0 0.7rem; text-align: left; font: inherit; color: inherit;
+}
+.beat-n {
+  font-family: var(--sans); font-size: 0.56rem; letter-spacing: 0.1em;
+  font-weight: 700; color: var(--faint);
+}
+.beat-name {
+  display: flex; align-items: baseline; gap: 0.35rem; min-width: 0;
+  font-family: var(--serif); font-size: 1.02rem; line-height: 1.3; color: var(--ink-soft);
+}
+.beat-name .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.beat-name .glyph { color: var(--mark); flex-shrink: 0; position: relative; top: 0.05rem; }
+.beat-fate {
+  font-family: var(--sans); font-size: 0.54rem; letter-spacing: 0.14em;
+  text-transform: uppercase; font-weight: 600; color: var(--faint); white-space: nowrap;
+}
+.beat-track {
+  grid-column: 2 / -1; display: block; position: relative;
+  width: var(--beat-of); height: 0.4rem; margin-top: 0.36rem;
+}
+.beat-track::after {
+  content: ""; position: absolute; inset: 0;
+  border: 1px dashed rgba(110, 98, 84, 0.5); border-radius: 1px;
+}
+.beat-bar {
+  position: relative; z-index: 1; display: block; height: 100%;
+  background: #857a6b; transition: background-color 120ms ease;
+}
+.beat.has-change .beat-bar { background: #9c4235; }
+.beat.has-change .beat-fate { color: var(--mark); }
+.beat:hover .beat-name { color: var(--ink); }
+.beat:hover .beat-bar { background: var(--ink-soft); }
+.beat.has-change:hover .beat-bar { background: var(--mark-deep); }
+.beat:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+.beat.is-gone .beat-name { font-style: italic; color: #8a7f72; }
+.beat.is-gone .beat-name .txt {
+  text-decoration: line-through; text-decoration-color: rgba(139, 46, 34, 0.45);
+}
+.beat.is-active .beat-name { color: var(--ink); }
+.beat.is-active .beat-name .txt { box-shadow: inset 0 -1px 0 var(--mark); }
+.beat.is-active .beat-bar { background: var(--mark-deep); }
+
+/* The desk's word for a footer tap, standing where the footer stands. It takes
+   the footer's own margin so the page keeps its rhythm, and it goes above the
+   rule rather than below it: a line added under the last line of the page lands
+   off the bottom of a phone, which is the one place it cannot be read. */
+.paper-note.is-foot { margin: 3.2rem 0 0; }
+.paper-note.is-foot + .sheet-foot { margin-top: 1.1rem; }
+
+/* The sample says where your own draft goes, at the top of the paper rather
+   than in a footer a whole manuscript below the fold. */
+.paper-yours {
+  margin: 0 0 1.5rem; max-width: var(--col);
+  font-family: var(--serif); font-style: italic; font-size: 0.95rem; color: var(--muted);
+}
+
+/* ---- the empty paper's two verbs ---- */
+.paper-empty-acts { display: flex; flex-wrap: wrap; gap: 0.55rem; margin: 1.4rem 0 0; }
+.paper-act {
+  appearance: none; cursor: pointer; display: inline-flex; align-items: center;
+  min-height: 42px; padding: 0 1rem;
+  background: none; border: 1px solid var(--mark); color: var(--mark);
+  font-family: var(--serif); font-style: italic; font-size: 1rem;
+}
+.paper-act:hover { background: var(--mark-wash); color: var(--mark-deep); border-color: var(--mark-deep); }
+.paper-act.is-quiet { border-color: var(--rule); color: var(--muted); }
+.paper-act.is-quiet:hover { border-color: var(--mark); color: var(--mark); background: none; }
+.paper-act:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+
+/* ---- the tuck on the stats bar: one word, and everything behind it ---- */
+.stats-tuck {
+  display: none; appearance: none; background: none; cursor: pointer;
+  border: 1px solid var(--rule); padding: 0 0.7rem; min-height: 34px;
+  align-items: center; flex: 0 0 auto;
+  font-family: var(--serif); font-style: italic; font-size: 0.86rem;
+  letter-spacing: 0; text-transform: none; font-weight: 400; color: var(--ink-soft);
+}
+.stats-tuck:hover, .stats-tuck[aria-expanded="true"] { color: var(--mark); border-color: var(--mark); }
+.stats-tuck:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   The mini desk. One thumb, 375px: the wordmark keeps its own row, the modes
+   are a map you get once there is a draft, the stats are one line with the
+   tools tucked behind a word, and the split stands its two columns on end.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  /* ---- header: brand on one row, verbs beside it, modes underneath ---- */
+  .chrome {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center; gap: 0 0.7rem;
+    padding: 0.2rem 0.8rem 0.25rem;
+  }
+  .chrome-controls { display: contents; }
+  .chrome-brand { grid-column: 1; grid-row: 1; min-width: 0; }
+  .chrome-acts { grid-column: 2; grid-row: 1; gap: 0.95rem; justify-self: end; }
+  .screens { grid-column: 1 / -1; grid-row: 2; gap: 0; margin: 0 -0.8rem; padding: 0 0.6rem; }
+  .screen-tab { padding: 0 0.5rem; min-height: 42px; align-items: center; font-size: 0.92rem; }
+  .layer-toggle { grid-column: 1 / -1; grid-row: 3; gap: 0.3rem; }
+  .chrome-kicker { font-size: 0.55rem; letter-spacing: 0.1em; white-space: nowrap; }
+  .chrome-title { display: none; }
+  /* Thumb-sized verbs, and nothing clipped by the right edge. */
+  .mode-toggle button, #export-btn {
+    min-height: 42px; display: inline-flex; align-items: center; padding: 0 0.1rem;
+  }
+
+  /* ---- stats: one line, and one word for the rest of it ---- */
+  .stats {
+    padding: 0.3rem 0.8rem 0.35rem; gap: 0.3rem 0.7rem;
+    flex-wrap: wrap; align-items: center;
+  }
+  .stats-count { flex: 1 1 auto; min-width: 0; gap: 0.3rem; }
+  .stats-types, .stats-iftaken { display: none; }
+  .stats-tuck { display: inline-flex; }
+  .stats-tools { display: none; }
+  .stats.is-tools-open { align-items: flex-start; }
+  .stats.is-tools-open .stats-count { flex: 1 1 100%; flex-wrap: wrap; order: 1; gap: 0.4rem; }
+  .stats.is-tools-open .stats-types { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; }
+  .stats.is-tools-open .stats-iftaken { display: inline; }
+  .stats.is-tools-open .stats-tuck { order: 3; }
+  .stats.is-tools-open .stats-tools {
+    order: 2;
+    display: flex; flex-direction: column; align-items: flex-start;
+    flex-basis: 100%; width: 100%; gap: 0.55rem;
+    padding: 0.45rem 0 0.2rem;
+    border-top: 1px solid color-mix(in srgb, var(--desk-2) 60%, #6a5e50 40%);
+  }
+  .filter-toggle, .bulk { flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+  /* One group to a row here, so the two words take the line above their chips
+     rather than crowding the first tap target off the screen. */
+  .filter-toggle { width: 100%; }
+  .filter-toggle .filter-lab { flex: 0 0 100%; white-space: normal; }
+  .filter-toggle .filter-opt { gap: 0; }
+  .filter-toggle .sep, .bulk .sep { display: none; }
+  .filter-toggle button, .bulk button, .stat-jump {
+    display: inline-flex; align-items: center; min-height: 38px; padding: 0 0.7rem;
+    border: 1px solid var(--rule);
+    background: color-mix(in srgb, var(--paper) 45%, transparent);
+  }
+  .filter-toggle button[aria-checked="true"] {
+    color: var(--ink); border-color: var(--mark); background: var(--mark-wash-2);
+  }
+  .stat-jump:hover:not(:disabled) { border-color: var(--mark); }
+
+  /* ---- the sheet: no margin left to hang a mark in, so it stands inline ---- */
+  :root { --gutter: 0rem; }
+  .stage { padding: 1rem 0.5rem 2.5rem; }
+  .sheet { padding: 1.7rem 1.1rem 2.6rem 1.1rem; }
+  .essay { font-size: 1.08rem; line-height: 1.58; }
+  .essay h1 { font-size: 1.85rem; }
+  .essay h2 { font-size: 1.14rem; margin: 2rem 0 0.8rem; }
+  .mark {
+    position: static; width: auto; flex-direction: row; flex-wrap: wrap;
+    align-items: center; gap: 0.1rem 0.9rem; margin: 0 0 0.3rem;
+  }
+  .mark-btn {
+    width: auto; flex-direction: row; align-items: center;
+    justify-content: flex-start; gap: 0.45rem; min-height: 38px;
+  }
+  .mark-btn .lbl { text-align: left; font-size: 0.55rem; letter-spacing: 0.12em; }
+  /* Take and Leave keep the thumb end of the row, and their own tap height. */
+  .mark-acts { margin-left: auto; gap: 0.2rem 1rem; }
+  .mark-act {
+    min-height: 38px; display: inline-flex; align-items: center;
+    font-size: 0.58rem; padding: 0 0.1rem;
+  }
+  body[data-mode="edited"] .change-block[data-whole] .mark { top: auto; }
+  .sheet-foot .keyhint { display: none; }
+  .draft-sheet .sheet-foot .keyhint { display: inline; }
+  .stamp {
+    top: 0.55rem; right: 0.6rem; font-size: 0.5rem; letter-spacing: 0.24em;
+    text-indent: 0.24em; padding: 0.22rem 0.42rem 0.2rem;
+  }
+  .stamp + .paper-note, .stamp + .paper-yours, .stamp + .paper-top { padding-right: 4.8rem; }
+  /* One thumb: the way home is a full-width target at the head of the paper. */
+  .paper-top { margin-bottom: 1.2rem; gap: 0.45rem 0.6rem; }
+  .paper-start { min-height: 42px; flex: 1 1 auto; justify-content: center; }
+  .paper-start.is-quiet { flex: 0 0 auto; }
+  .paper-top-ask { width: 100%; gap: 0.4rem; }
+  .paper-top-ask .sep { display: none; }
+  .paper-top-copy { flex: 1 1 100%; }
+  /* The way out of the notice reads at the end of it, not off in a corner. */
+  .paper-note-x { margin-left: 0; }
+  .paper-empty { margin: 0.8rem 0 2.4rem; }
+  .paper-empty-lead { font-size: 1.35rem; }
+
+  /* ---- the blotter: Run pass above the fold, compare below it ---- */
+  .blotter { padding: 1rem 0.95rem 1.05rem; gap: 0.65rem; }
+  .blotter-body { display: contents; }
+  .blotter-head { order: 0; }
+  .ms-original { order: 1; }
+  .blotter-acts { order: 2; gap: 0.5rem 0.6rem; }
+  .blotter-note { order: 3; }
+  .blotter-drop { order: 4; }
+  .blotter-side { order: 5; border-left: 0; border-top: 1px solid var(--rule); padding: 0.85rem 0 0; }
+  .blotter-hint { font-size: 0.86rem; }
+  .ms-original textarea.ms { min-height: 8.5rem; padding: 0.7rem 0.75rem; font-size: 1.02rem; }
+  .ms-edited textarea.ms { min-height: 6.5rem; }
+  .blotter-acts button, .blotter-confirm button {
+    min-height: 40px; display: inline-flex; align-items: center; padding: 0 0.1rem;
+  }
+  .drop-open { min-height: 40px; }
+
+  .reading-opt { min-height: 42px; display: inline-flex; align-items: center; }
+
+  /* ---- beats: one row per beat, and never a sideways scroll ---- */
+  .beats-sheet { padding-left: 1.1rem; padding-bottom: 2.6rem; }
+  .beats-hint { font-size: 0.92rem; }
+  .beat { grid-template-columns: 1.7rem minmax(0, 1fr) auto; gap: 0.15rem 0.5rem; padding: 0.5rem 0; }
+  .beat-name .txt { white-space: normal; }
+  .beat-fate { font-size: 0.5rem; }
+  .beat-track { min-width: 3rem; }
+
+  /* ---- split: the two columns stand on end, original over working copy ---- */
+  .split-sheet { max-width: none; padding: 1.7rem 1.1rem 2.6rem; }
+  .split-doc-head h1 { font-size: 1.7rem; }
+  .split-grid { grid-template-columns: minmax(0, 1fr); }
+  .split-lab, .split-lab-gut { display: none; }
+  /* Prose the pass left alone is the same on both sides; it is read once. */
+  .split-cell.is-right:not(.is-change) { display: none; }
+  .split-cell.is-head.is-right:not(.is-gone) { display: none; }
+  .split-cell { font-size: 1.02rem; padding: 0.4rem 0 0.15rem; }
+  .split-cell.is-change { padding: 0.55rem 0.7rem 0.4rem; }
+  .split-cell.is-change.wash-compressed { padding-left: 0.7rem; margin-left: 0; }
+  .split-cell.is-change::before {
+    content: "Original"; display: block; margin-bottom: 0.3rem;
+    font-family: var(--sans); font-size: 0.5rem; letter-spacing: 0.16em;
+    text-transform: uppercase; font-weight: 600; color: var(--faint);
+  }
+  .split-cell.is-change.is-right::before { content: "Edited"; color: var(--mark); }
+  /* The gutter is the rule between two readings, not a column beside them. */
+  .split-gutter {
+    border: 0; background: none; justify-content: flex-start;
+    padding: 0.45rem 0.7rem 0.1rem;
+  }
+  .split-gutter .mark-btn .lbl { text-align: left; font-size: 0.55rem; }
+  .split-gutter .mark-act { font-size: 0.58rem; }
+  .split-slip { padding: 0 0.7rem; }
+  .split-changed { margin-bottom: 0.9rem; }
+  .split-changed button { min-height: 34px; display: inline-flex; align-items: center; }
+
+  /* A word in a sentence stays a word in a sentence; the thumb gets the room
+     it needs from an invisible box behind it, not from a button in the prose. */
+  .foot-draft, .paper-note-x { position: relative; }
+  .foot-draft::after, .paper-note-x::after {
+    content: ""; position: absolute; left: -0.3rem; right: -0.3rem;
+    top: 50%; height: 40px; transform: translateY(-50%);
+  }
+
+  /* ---- the slip is a card at this width, and its verbs are tappable ---- */
+  .slip { padding: 0.7rem 0.8rem 0.75rem 0.85rem; }
+  .slip-top { flex-wrap: wrap; gap: 0.4rem 0.7rem; }
+  .slip-where { margin-left: 0; padding-right: 0; max-width: 100%; }
+  .slip-close, .slip-act { min-height: 38px; display: inline-flex; align-items: center; }
+  .slip-actions { gap: 1rem; }
+}
