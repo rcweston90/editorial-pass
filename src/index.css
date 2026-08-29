@@ -286,3 +286,61 @@ body[data-mode="edited"] .change-block[data-whole] .mark { top: 1.05rem; }
 .block-scar { padding: 0.1rem 0; }
 .block-scar:hover .scar-rule { opacity: 1; border-top-width: 2px; }
 .scar-rule { transition: opacity 120ms ease; }
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Product surface: the blotter, the stats bar, decisions, the split desk.
+   Same tokens, same fonts, same shadow language as the sheet above.
+   ───────────────────────────────────────────────────────────────────────── */
+
+#export-btn {
+  appearance: none; background: none; border: 0; padding: 0.1rem 0.05rem 0.12rem;
+  font-family: var(--serif); font-style: italic; font-size: 0.95rem;
+  color: var(--muted); cursor: pointer; border-bottom: 1px solid transparent;
+}
+#export-btn:hover { color: var(--ink-soft); }
+#export-btn:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+.layer-toggle .layer-opt { display: inline-flex; align-items: baseline; gap: 0.4rem; }
+.layer-toggle { gap: 0.4rem; }
+
+.stats {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem 1.6rem; flex-wrap: wrap;
+  padding: 0.42rem 1.4rem 0.46rem;
+  background: color-mix(in srgb, var(--desk) 94%, #6a5e50 6%);
+  border-bottom: 1px solid color-mix(in srgb, var(--desk-2) 72%, #6a5e50 28%);
+  font-family: var(--sans); font-size: 0.56rem; letter-spacing: 0.14em;
+  text-transform: uppercase; font-weight: 600; color: #6d6357;
+}
+.stats-count { display: flex; align-items: baseline; gap: 0.38rem; flex-wrap: wrap; }
+.stats .fig {
+  font-family: var(--serif); font-style: italic; font-size: 0.95rem;
+  letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--ink-soft);
+}
+.stats .arrow { font-family: var(--serif); font-size: 0.9rem; color: var(--mark); letter-spacing: 0; }
+.stats .dot { color: var(--faint); letter-spacing: 0; margin: 0 0.1rem; }
+.stats-tools { display: flex; align-items: center; gap: 1.15rem; flex-wrap: wrap; }
+
+.filter-toggle { display: flex; align-items: baseline; gap: 0.34rem; }
+.filter-toggle.is-muted { opacity: 0.42; transition: opacity 140ms ease; }
+.filter-toggle.is-muted:hover, .filter-toggle.is-muted:focus-within { opacity: 1; }
+.filter-toggle .filter-lab {
+  display: inline-flex; align-items: baseline; gap: 0.4rem;
+  color: inherit; white-space: nowrap;
+}
+.filter-toggle .filter-gloss {
+  font-family: var(--serif); font-style: italic; font-size: 0.82rem;
+  letter-spacing: 0; text-transform: none; font-weight: 400; color: #6d6357;
+}
+.filter-toggle .filter-opt { display: inline-flex; align-items: baseline; gap: 0.34rem; }
+.filter-toggle button, .bulk button {
+  appearance: none; background: none; border: 0; padding: 0 0 0.08rem; cursor: pointer;
+  font-family: var(--serif); font-style: italic; font-size: 0.86rem;
+  letter-spacing: 0; text-transform: none; font-weight: 400;
+  color: var(--muted); border-bottom: 1px solid transparent;
+}
+.filter-toggle button[aria-checked="true"] { color: var(--ink); border-bottom-color: var(--mark); }
+.filter-toggle button:hover, .bulk button:hover { color: var(--ink-soft); }
+.filter-toggle button:focus-visible, .bulk button:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+.stats .sep { color: var(--faint); font-family: var(--serif); font-size: 0.85rem; letter-spacing: 0; }
+.bulk { display: flex; align-items: baseline; gap: 0.34rem; }
