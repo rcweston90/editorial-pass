@@ -367,3 +367,401 @@ export default function App() {
   )
 
   const undo = useCallback(() => {
+    if (undoStack.length === 0) return
+    const decisions = undoStack[undoStack.length - 1]
+    setUndoStack((stack) => stack.slice(0, -1))
+    setSession((s) => ({ ...s, decisions }))
+  }, [undoStack])
+
+  /* ---------------- drafts and passes ---------------- */
+
+  /* Touching a box outdates whatever the desk last said, so the notice goes and
+     the paper falls back to the truth: this draft has not been read yet. The
+     stamp comes off the moment the sample's own text is no longer on the paper. */
+  const setOriginal = useCallback((originalMd: string) => {
+    setNotice(null)
+    setSession((s) => ({ ...s, originalMd, sample: s.sample && originalMd === exampleOriginalMd }))
+  }, [])
+  const setEdited = useCallback((editedMd: string) => {
+    setNotice(null)
+    setSession((s) => ({ ...s, editedMd }))
+  }, [])
+
+  /** A pass has just been read: screen two is where it is, so that is where you go. */
+  const landOnMarks = useCallback((text: string | null) => {
+    landing.current = true
+    setUndoStack([])
+    setOpenId(null)
+    setFocusId(null)
+    setFilters({ type: 'all', track: 'all' })
+    setMode('original')
+    setScreen('marks')
+    setNotice(text ? { text, at: 'paper' } : null)
+  }, [])
+
+  /**
+   * A desk action, asked for out loud: it replaces what is on the paper with
+   * the two files in comparison/ — a real draft and a real pass over it, one in
+   * each box, already diffed into the marks the other three screens read.
+   */
+  const loadExample = useCallback(() => {
+    landOnMarks('The sample draft and the pass over it are on the desk. Start over clears them.')
+    setSession(exampleSession())
+  }, [landOnMarks])
+
+  const compare = useCallback(() => {
+    if (!session.originalMd.trim() || !session.editedMd.trim()) return
+    const base = ensureDocument(session, session.originalMd)
+    const existing = base.layers.find((l) => l.label === 'Compare')
+    const layerId = existing?.id ?? nextLayerId(base, 'compare')
+    const marksOut = diffToMarks(base.document, parseMarkdown(session.editedMd), layerId)
+    landOnMarks(null)
+    setSession(withLayer(base, { id: layerId, label: 'Compare', source: 'diff', marks: marksOut }))
+  }, [session, landOnMarks])
+
+  const pass = useCallback(async () => {
+    if (!session.originalMd.trim() || busy) return
+    setBusy(true)
+    try {
+      const base = ensureDocument(session, session.originalMd)
+      const layerId = nextLayerId(base, 'pass')
+      const result = await runPass(base.document, base.originalMd, layerId, llmAvailable)
+      landOnMarks(result.notice)
+      setSession(
+        withLayer(base, {
+          id: layerId,
+          label: result.label,
+          source: result.source,
+          marks: result.marks,
+        }),
+      )
+    } finally {
+      setBusy(false)
+    }
+  }, [session, busy, llmAvailable, landOnMarks])
+
+  /**
+   * The anchor lives in the document and keeps its blob until the next export.
+   * A link that is created, clicked and removed inside one tick gets swallowed;
+   * this one is a real link, and the notice only claims what actually happened.
+   */
+  const exportMd = useCallback((at: NoticeAt) => {
+    const text = exportMarkdown(session.document, marks, session.decisions)
+    const name = `${fileSlug(session.title)}.md`
+    const link = download.current
+    let saved = false
+
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }))
+      if (blobUrl.current) URL.revokeObjectURL(blobUrl.current)
+      blobUrl.current = url
+      if (link) {
+        link.href = url
+        link.download = name
+        link.click()
+        saved = true
+      } else {
+        saved = window.open(url, '_blank') !== null
+      }
+    } catch {
+      saved = false
+    }
+
+    setNotice({
+      text: saved ? `Downloaded ${name}.` : `Could not write ${name} — copying it instead.`,
+      at,
+    })
+    void navigator.clipboard
+      ?.writeText(text)
+      .then(() => {
+        setNotice({
+          text: saved
+            ? `Downloaded ${name}. The working copy is on your clipboard too.`
+            : `Could not write ${name}. The working copy is on your clipboard.`,
+          at,
+        })
+      })
+      .catch(() => undefined)
+  }, [session, marks])
+
+  /**
+   * The way home. It throws the desk away — the draft, the marks, and the store
+   * they were kept in — and leaves the empty paper of screen one, which is
+   * where a cold load opens and where this one puts you back.
+   */
+  const startOver = useCallback(() => {
+    clearSession()
+    setSession(emptySession())
+    setScreen('draft')
+    setMode('original')
+    setOpenId(null)
+    setFocusId(null)
+    setActiveSection(null)
+    setFilters({ type: 'all', track: 'all' })
+    setUndoStack([])
+    setNotice(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
+  /** Reading a version is screen two's business, so asking for one goes there. */
+  const read = useCallback((choice: Mode) => {
+    setMode(choice)
+    setScreen('marks')
+  }, [])
+
+  /* ---------------- keyboard ---------------- */
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement | null
+      if (el && (TYPING.has(el.tagName) || el.isContentEditable)) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+
+      // 1 to 4 are the screens, in the order the nav prints them.
+      const numbered = screenAt(e.key, ready)
+      if (numbered) {
+        e.preventDefault()
+        setScreen(numbered)
+        return
+      }
+
+      switch (e.key) {
+        case 'Escape':
+          if (openId) {
+            e.preventDefault()
+            closeSlip()
+          }
+          return
+        case 'j':
+        case 'ArrowDown':
+          e.preventDefault()
+          step(1)
+          return
+        case 'k':
+        case 'ArrowUp':
+          e.preventDefault()
+          step(-1)
+          return
+        case 'Enter': {
+          if (order.length === 0) return
+          e.preventDefault()
+          if (!focusId) {
+            setFocusId(order[0])
+            scrollToHost(order[0])
+            return
+          }
+          const willOpen = openId !== focusId
+          toggleSlip(focusId)
+          if (willOpen) scrollToHost(focusId)
+          return
+        }
+        case 'a':
+        case 'y':
+          e.preventDefault()
+          decideFocused('accepted')
+          return
+        case 'r':
+        case 'n':
+          e.preventDefault()
+          decideFocused('rejected')
+          return
+        case 'u':
+          e.preventDefault()
+          undo()
+          return
+        case 'o':
+          if (!ready) return
+          e.preventDefault()
+          read('original')
+          return
+        case 'e':
+          if (!ready) return
+          e.preventDefault()
+          read('edited')
+          return
+        case 'd':
+          e.preventDefault()
+          setScreen('draft')
+          return
+        default:
+      }
+    }
+
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [
+    openId,
+    focusId,
+    order,
+    ready,
+    closeSlip,
+    step,
+    toggleSlip,
+    scrollToHost,
+    decideFocused,
+    read,
+    undo,
+  ])
+
+  const typeOf = useCallback(
+    (changeId: string | null): ChangeType | null =>
+      changeId ? marksById.get(changeId)?.type ?? null : null,
+    [marksById],
+  )
+
+  // Reading the sample rather than a draft of your own: say where yours goes.
+  const onboard = session.sample
+  const stale = session.docMd !== null && session.docMd !== session.originalMd
+  const deskNote =
+    notice ??
+    (stale
+      ? { text: 'Draft not read yet — Compare versions or Run pass.', at: 'draft' as NoticeAt }
+      : null)
+  /* Whatever the desk last said belongs beside the tap that earned it: an
+     Export from the footer answers in the footer, one from the chrome answers
+     at the top of the paper. Screen one has one place to answer, so everything
+     said while you are standing on it is said there. */
+  const notePlace: NoticeAt | null = !deskNote
+    ? null
+    : screen === 'draft'
+      ? 'draft'
+      : deskNote.at === 'draft'
+        ? 'paper'
+        : deskNote.at
+  const noteText = deskNote?.text ?? null
+  const draftNote = notePlace === 'draft' ? noteText : null
+  const paperNote = notePlace === 'paper' ? noteText : null
+  const footNote = notePlace === 'foot' ? noteText : null
+  const dismissNote = useCallback(() => setNotice(null), [])
+  const toDraft = useCallback(() => setScreen('draft'), [])
+  const toMarks = useCallback(() => setScreen('marks'), [])
+
+  const head = {
+    title: session.document.title,
+    derivedTitle: session.document.derivedTitle,
+    byline: session.document.byline,
+    epigraph: session.document.epigraph,
+  }
+
+  // There is a draft, a pass, or a store holding one: something to go home from.
+  const canReset =
+    session.originalMd.trim() !== '' || session.editedMd.trim() !== '' || marks.length > 0
+
+  const paperProps = {
+    marks: marksById,
+    markCount: marks.length,
+    openId,
+    focusedId: focusId,
+    where: render.whereOfMark,
+    onToggle: toggleSlip,
+    onDecide: decide,
+    onCloseSlip: closeSlip,
+    onboard,
+    sample: session.sample,
+    onDraft: toDraft,
+    notice: paperNote,
+    footNote,
+    onDismissNotice: notice ? dismissNote : undefined,
+    onExport: () => exportMd('foot'),
+    registerHost,
+    registerAnchor,
+  }
+
+  let sheet
+  if (screen === 'draft') {
+    sheet = (
+      <DraftSheet
+        sample={session.sample}
+        words={wordCount(session.originalMd)}
+        ready={ready}
+        canReset={canReset}
+        onStartOver={startOver}
+        onMarks={toMarks}
+      >
+        <Composer
+          originalMd={session.originalMd}
+          editedMd={session.editedMd}
+          onOriginal={setOriginal}
+          onEdited={setEdited}
+          onLoadExample={loadExample}
+          onCompare={compare}
+          onRunPass={() => void pass()}
+          busy={busy}
+          notice={draftNote}
+          marked={marks.length > 0}
+        />
+      </DraftSheet>
+    )
+  } else if (screen === 'split') {
+    sheet = <SplitSheet head={head} rows={splitRows} changed={changed} {...paperProps} />
+  } else if (screen === 'beats') {
+    sheet = (
+      <BeatsSheet
+        beats={render.flow}
+        typeOf={typeOf}
+        activeSection={activeSection}
+        onJump={jumpToBeat}
+        markCount={marks.length}
+        sample={session.sample}
+        notice={paperNote}
+        footNote={footNote}
+        onDismissNotice={notice ? dismissNote : undefined}
+        onExport={() => exportMd('foot')}
+      />
+    )
+  } else {
+    sheet = (
+      <EssaySheet
+        head={head}
+        sections={render.sections}
+        decisions={session.decisions}
+        mode={mode}
+        onMode={setMode}
+        empty={empty}
+        {...paperProps}
+      />
+    )
+  }
+
+  return (
+    <>
+      <div className="topstack" ref={topstack}>
+        <Chrome
+          title={session.title}
+          screen={screen}
+          onScreen={setScreen}
+          ready={ready}
+          layers={session.layers}
+          activeLayerId={session.activeLayerId}
+          onLayer={(id) => {
+            setOpenId(null)
+            setFocusId(null)
+            setSession((s) => ({ ...s, activeLayerId: id }))
+          }}
+          onExport={() => exportMd('paper')}
+        />
+        {/* The counts and the filters belong to the marks, so they stand on the
+            two screens that draw them and nowhere else. */}
+        {ready && (screen === 'marks' || screen === 'split') ? (
+          <StatsBar
+            stats={stats}
+            filters={filters}
+            armed={openId !== null}
+            onFilters={setFilters}
+            onJumpType={jumpToType}
+            onKeepAll={() => bulk('accepted')}
+            onKeepMineAll={() => bulk('rejected')}
+            onUndo={undo}
+            canUndo={undoStack.length > 0}
+            shown={shown}
+          />
+        ) : null}
+      </div>
+      <div className="workspace">{sheet}</div>
+      {/* Export writes through this. It stays in the document on purpose. */}
+      <a ref={download} className="export-anchor" aria-hidden="true" tabIndex={-1}>
+        export
+      </a>
+    </>
+  )
+}
