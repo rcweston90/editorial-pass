@@ -147,6 +147,7 @@ export function Composer({
 
   const empty = originalMd.trim().length === 0
   const noEdit = editedMd.trim().length === 0
+  // Nothing to lose, nothing to ask about: a blank desk just takes the sample.
   const wouldOverwrite = !empty || !noEdit || marked
 
   return (
@@ -159,6 +160,7 @@ export function Composer({
     >
       <div className="blotter-head">
         <h2>Draft</h2>
+        {/* The first instruction is the whole instruction: paste, then Run pass. */}
         <p className="blotter-hint">
           <b>Paste a draft here, then Run pass.</b> A <code>.md</code> dropped anywhere on the
           desk lands on this paper too. The marks come back on screen two.
@@ -173,6 +175,8 @@ export function Composer({
           'Run pass reads this paper alone.',
           'Paste your draft here, then Run pass.',
         )}
+        {/* The compare box is the exception, not the second half of the desk:
+            it keeps the margin, and stays empty until someone asks for it. */}
         <aside className="blotter-side" aria-label="Compare versions">
           {field(
             'edited',
@@ -185,6 +189,7 @@ export function Composer({
         </aside>
       </div>
       <div className="blotter-acts">
+        {/* A desk action, not a modal: the question stands in the row it came from. */}
         {confirming ? (
           <span className="blotter-confirm">
             <span className="confirm-copy">This replaces what is on the paper.</span>

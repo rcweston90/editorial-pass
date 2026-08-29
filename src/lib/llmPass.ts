@@ -27,6 +27,7 @@ interface ApiMark {
   alteredExcerpts?: unknown
 }
 
+/** Asked once on load; a dev server with no function just answers with HTML. */
 export async function probePass(): Promise<boolean> {
   try {
     const res = await fetch(ENDPOINT, { method: 'GET', headers: { accept: 'application/json' } })
@@ -49,6 +50,7 @@ interface Site {
   index: number
 }
 
+/** Excerpts come back as prose; the manuscript is the authority on where it sits. */
 function locate(sites: Site[], excerpt: string): Site | null {
   let best: Site | null = null
   let score = MATCH
@@ -84,6 +86,8 @@ function mapMarks(doc: DocumentModel, raw: ApiMark[], layerId: string): Mark[] {
     }
     if (!found.length) return
 
+    // One mark cannot straddle two sections, and its span has to be contiguous
+    // or the sheet would render the paragraphs it skipped out of order.
     const section = found[0].section
     const inSection = found.filter((f) => f.section.id === section.id)
     const lo = Math.min(...inSection.map((f) => f.index))
@@ -124,10 +128,13 @@ function fallbackNote(type: ChangeType, span: number): string {
 const NO_KEY = 'Local pass — no model key on this deploy.'
 const FAILED = 'Local pass — the model call did not come back.'
 const THIN = 'Local pass — the model returned nothing that matched the manuscript.'
+
 const EMPTY = 'There is not enough draft here to mark. Paste more of it.'
 
 function local(doc: DocumentModel, layerId: string, notice: string | null): PassResult {
   const marks = localPass(doc, layerId)
+  // A pass that comes back with nothing says so out loud rather than looking
+  // like it worked and found a perfect draft.
   const said = marks.length === 0 ? [notice, EMPTY].filter(Boolean).join(' ') : notice
   return { marks, label: 'Local pass', source: 'local', notice: said }
 }
