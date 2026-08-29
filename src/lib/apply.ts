@@ -140,7 +140,7 @@ export function exportMarkdown(
 export function fileSlug(title: string): string {
   const s = title
     .toLowerCase()
-    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[‘’]/g, "'")
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60)

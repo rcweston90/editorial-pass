@@ -5,7 +5,7 @@
 export function normalize(s: string): string {
   const words = s
     .toLowerCase()
-    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[‘’]/g, "'")
     .replace(/[^\p{L}\p{N}'\s]+/gu, ' ')
     .split(/\s+/)
   const out: string[] = []
@@ -63,7 +63,7 @@ export const MATCH = 0.55
 
 export function sentences(text: string): string[] {
   const out: string[] = []
-  const re = /[^.!?]+[.!]?\s*/g
+  const re = /[^.!?]+[.!?]*\s*/g
   let m: RegExpExecArray | null
   while ((m = re.exec(text)) !== null) {
     const s = m[0]
