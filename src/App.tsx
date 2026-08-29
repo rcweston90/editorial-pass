@@ -63,9 +63,11 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
 
+  // The manuscript owns the scroll targets; these keep the handlers off the DOM query path.
   const hosts = useRef<Record<string, HTMLElement | null>>({})
   const topstack = useRef<HTMLDivElement | null>(null)
   const anchors = useRef<Record<string, HTMLElement | null>>({})
+  // A real anchor, in the document, so Export writes a file instead of a promise.
   const download = useRef<HTMLAnchorElement | null>(null)
   const blobUrl = useRef<string | null>(null)
 
@@ -78,6 +80,11 @@ export default function App() {
 
   const marks = useMemo(() => activeMarks(session), [session])
   const marksById = useMemo(() => markIndex(marks), [marks])
+
+  /* Nothing has been read onto the paper, so there is nothing to read three
+     ways. Screen one is always open; the other three arrive with the pass — and
+     Start over, which takes the pass away, hands you back to screen one without
+     having to remember to. */
   const empty = isEmptyDesk(session)
   const ready = !empty
   const screen: Screen = screenLive(asked, ready) ? asked : 'draft'
@@ -129,11 +136,19 @@ export default function App() {
       live = false
     }
   }, [])
+
+  // A mark that a filter just hid should not keep the focus ring or the slip.
   useEffect(() => {
     if (openId && !order.includes(openId)) setOpenId(null)
     if (focusId && !order.includes(focusId)) setFocusId(null)
   }, [order, openId, focusId])
 
+  /**
+   * j and k move the reading eye, not the page. A mark already on the paper is
+   * left where it sits; one that is off it comes to rest just under the chrome.
+   * Centring it instead sends a short manuscript to the bottom of the page,
+   * which is how you lose the mark you just asked for.
+   */
   const scrollToHost = useCallback((id: string) => {
     const el = hosts.current[id]
     if (!el) return
@@ -143,6 +158,9 @@ export default function App() {
     window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - rest), behavior: 'smooth' })
   }, [])
 
+  /* A jump that crosses a screen cannot scroll in the handler that asked for
+     it: the paper it is aiming at is not on the page yet. It is parked here and
+     spent once the screen it belongs to has been drawn. */
   const jump = useRef<{ kind: 'host' | 'anchor'; id: string } | null>(null)
   useEffect(() => {
     const target = jump.current
@@ -152,6 +170,8 @@ export default function App() {
     else anchors.current[target.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [screen, order, scrollToHost])
 
+  /* A pass that lands under the chrome is a pass you have to go looking for, so
+     the marks screen comes up to its first mark as soon as the marks exist. */
   const landing = useRef(false)
   useEffect(() => {
     if (!landing.current || screen !== 'marks') return
@@ -160,10 +180,12 @@ export default function App() {
   }, [screen, order, scrollToHost])
 
   const beatOf = render.beatOfGraf
+
   const closeSlip = useCallback(() => {
     setOpenId(null)
     setActiveSection(null)
   }, [])
+
   const openSlip = useCallback(
     (id: string, scroll: boolean) => {
       const mark = marksById.get(id)
@@ -175,6 +197,7 @@ export default function App() {
     },
     [marksById, beatOf, scrollToHost],
   )
+
   const toggleSlip = useCallback(
     (id: string) => {
       if (openId === id) closeSlip()
@@ -182,6 +205,8 @@ export default function App() {
     },
     [openId, closeSlip, openSlip],
   )
+
+  /** j/k walk the visible marks. If a slip is open it follows the focus. */
   const step = useCallback(
     (dir: number) => {
       if (order.length === 0) return
@@ -195,6 +220,12 @@ export default function App() {
     },
     [order, focusId, openId, openSlip, scrollToHost],
   )
+
+  /**
+   * A beat on screen four is a place in the manuscript, so clicking it goes
+   * there: to its mark if the pass left one, to the prose itself if it did not.
+   * Either way the paper is on screen two, so the scroll waits for it.
+   */
   const jumpToBeat = useCallback(
     (beat: FlowSection) => {
       setActiveSection(beat.id)
@@ -209,6 +240,11 @@ export default function App() {
     },
     [openSlip],
   )
+
+  /**
+   * The counts in the stats bar are a files-changed list: they walk their marks.
+   * The count is of the whole pass, so a filter hiding what you clicked lifts.
+   */
   const jumpToType = useCallback(
     (type: ChangeType) => {
       const ofType = walkOrder(session.document, marks, { type, track: 'all' })
@@ -219,22 +255,39 @@ export default function App() {
     },
     [session.document, marks, order, focusId, openSlip],
   )
+
+  /* ---------------- the desk takes a draft ---------------- */
+
+  /**
+   * A draft arrives the way drafts arrive: dropped on the desk, or pasted onto
+   * it with nothing in particular focused. Wherever it lands on the page it
+   * goes to the draft screen, and the desk goes there with it.
+   */
   const landDraft = useCallback((text: string, note: string, second?: string) => {
     const draft = text.replace(/\r\n?/g, '\n').trim()
     if (!draft) return
     setSession((s) => ({
       ...s,
       originalMd: draft,
+      // Two files at once are a comparison; one never fills the second box.
       editedMd: second === undefined ? s.editedMd : second.replace(/\r\n?/g, '\n').trim(),
       sample: s.sample && draft === exampleOriginalMd,
     }))
     setScreen('draft')
     setNotice({ text: note, at: 'draft' })
   }, [])
+
+  /** What is on the paper now, for handlers that must not go stale. */
   const draftRef = useRef(session.originalMd)
   useEffect(() => {
     draftRef.current = session.originalMd
   }, [session.originalMd])
+
+  /**
+   * A .md dropped anywhere but the draft box used to be opened by the browser,
+   * which throws the whole desk away; a paste with nothing focused used to go
+   * nowhere at all. Both land on screen one now, wherever they arrive.
+   */
   useEffect(() => {
     const scrap = (text: string) => draftRef.current.trim() !== '' && text.trim().length < SCRAP
     const allow = (e: DragEvent) => e.preventDefault()
@@ -273,9 +326,13 @@ export default function App() {
       document.removeEventListener('paste', onPaste)
     }
   }, [landDraft])
+
+  /* ---------------- decisions ---------------- */
+
   const pushUndo = useCallback(() => {
     setUndoStack((stack) => [...stack, session.decisions].slice(-UNDO_CAP))
   }, [session.decisions])
+
   const decide = useCallback(
     (id: string, decision: Decision) => {
       if (!marksById.has(id)) return
@@ -284,6 +341,7 @@ export default function App() {
     },
     [marksById, pushUndo],
   )
+
   const decideFocused = useCallback(
     (decision: Decision) => {
       const id = openId ?? focusId
@@ -291,6 +349,7 @@ export default function App() {
     },
     [openId, focusId, decide],
   )
+
   const bulk = useCallback(
     (decision: Decision) => {
       const targets = visibleMarks(marks, filters)
@@ -306,335 +365,5 @@ export default function App() {
     },
     [marks, filters, pushUndo],
   )
+
   const undo = useCallback(() => {
-    if (undoStack.length === 0) return
-    const decisions = undoStack[undoStack.length - 1]
-    setUndoStack((stack) => stack.slice(0, -1))
-    setSession((s) => ({ ...s, decisions }))
-  }, [undoStack])
-  const setOriginal = useCallback((originalMd: string) => {
-    setNotice(null)
-    setSession((s) => ({ ...s, originalMd, sample: s.sample && originalMd === exampleOriginalMd }))
-  }, [])
-  const setEdited = useCallback((editedMd: string) => {
-    setNotice(null)
-    setSession((s) => ({ ...s, editedMd }))
-  }, [])
-  const landOnMarks = useCallback((text: string | null) => {
-    landing.current = true
-    setUndoStack([])
-    setOpenId(null)
-    setFocusId(null)
-    setFilters({ type: 'all', track: 'all' })
-    setMode('original')
-    setScreen('marks')
-    setNotice(text ? { text, at: 'paper' } : null)
-  }, [])
-  const loadExample = useCallback(() => {
-    landOnMarks('The sample draft and the pass over it are on the desk. Start over clears them.')
-    setSession(exampleSession())
-  }, [landOnMarks])
-  const compare = useCallback(() => {
-    if (!session.originalMd.trim() || !session.editedMd.trim()) return
-    const base = ensureDocument(session, session.originalMd)
-    const existing = base.layers.find((l) => l.label === 'Compare')
-    const layerId = existing?.id ?? nextLayerId(base, 'compare')
-    const marksOut = diffToMarks(base.document, parseMarkdown(session.editedMd), layerId)
-    landOnMarks(null)
-    setSession(withLayer(base, { id: layerId, label: 'Compare', source: 'diff', marks: marksOut }))
-  }, [session, landOnMarks])
-  const pass = useCallback(async () => {
-    if (!session.originalMd.trim() || busy) return
-    setBusy(true)
-    try {
-      const base = ensureDocument(session, session.originalMd)
-      const layerId = nextLayerId(base, 'pass')
-      const result = await runPass(base.document, base.originalMd, layerId, llmAvailable)
-      landOnMarks(result.notice)
-      setSession(
-        withLayer(base, {
-          id: layerId,
-          label: result.label,
-          source: result.source,
-          marks: result.marks,
-        }),
-      )
-    } finally {
-      setBusy(false)
-    }
-  }, [session, busy, llmAvailable, landOnMarks])
-  const exportMd = useCallback((at: NoticeAt) => {
-    const text = exportMarkdown(session.document, marks, session.decisions)
-    const name = `${fileSlug(session.title)}.md`
-    const link = download.current
-    let saved = false
-    try {
-      const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }))
-      if (blobUrl.current) URL.revokeObjectURL(blobUrl.current)
-      blobUrl.current = url
-      if (link) {
-        link.href = url
-        link.download = name
-        link.click()
-        saved = true
-      } else {
-        saved = window.open(url, '_blank') !== null
-      }
-    } catch {
-      saved = false
-    }
-    setNotice({
-      text: saved ? `Downloaded ${name}.` : `Could not write ${name} — copying it instead.`,
-      at,
-    })
-    void navigator.clipboard
-      ?.writeText(text)
-      .then(() => {
-        setNotice({
-          text: saved
-            ? `Downloaded ${name}. The working copy is on your clipboard too.`
-            : `Could not write ${name}. The working copy is on your clipboard.`,
-          at,
-        })
-      })
-      .catch(() => undefined)
-  }, [session, marks])
-  const startOver = useCallback(() => {
-    clearSession()
-    setSession(emptySession())
-    setScreen('draft')
-    setMode('original')
-    setOpenId(null)
-    setFocusId(null)
-    setActiveSection(null)
-    setFilters({ type: 'all', track: 'all' })
-    setUndoStack([])
-    setNotice(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
-  const read = useCallback((choice: Mode) => {
-    setMode(choice)
-    setScreen('marks')
-  }, [])
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const el = e.target as HTMLElement | null
-      if (el && (TYPING.has(el.tagName) || el.isContentEditable)) return
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      const numbered = screenAt(e.key, ready)
-      if (numbered) {
-        e.preventDefault()
-        setScreen(numbered)
-        return
-      }
-      switch (e.key) {
-        case 'Escape':
-          if (openId) {
-            e.preventDefault()
-            closeSlip()
-          }
-          return
-        case 'j':
-        case 'ArrowDown':
-          e.preventDefault()
-          step(1)
-          return
-        case 'k':
-        case 'ArrowUp':
-          e.preventDefault()
-          step(-1)
-          return
-        case 'Enter': {
-          if (order.length === 0) return
-          e.preventDefault()
-          if (!focusId) {
-            setFocusId(order[0])
-            scrollToHost(order[0])
-            return
-          }
-          const willOpen = openId !== focusId
-          toggleSlip(focusId)
-          if (willOpen) scrollToHost(focusId)
-          return
-        }
-        case 'a':
-        case 'y':
-          e.preventDefault()
-          decideFocused('accepted')
-          return
-        case 'r':
-        case 'n':
-          e.preventDefault()
-          decideFocused('rejected')
-          return
-        case 'u':
-          e.preventDefault()
-          undo()
-          return
-        case 'o':
-          if (!ready) return
-          e.preventDefault()
-          read('original')
-          return
-        case 'e':
-          if (!ready) return
-          e.preventDefault()
-          read('edited')
-          return
-        case 'd':
-          e.preventDefault()
-          setScreen('draft')
-          return
-        default:
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [openId, focusId, order, ready, closeSlip, step, toggleSlip, scrollToHost, decideFocused, read, undo])
-  const typeOf = useCallback(
-    (changeId: string | null): ChangeType | null =>
-      changeId ? marksById.get(changeId)?.type ?? null : null,
-    [marksById],
-  )
-  const onboard = session.sample
-  const stale = session.docMd !== null && session.docMd !== session.originalMd
-  const deskNote =
-    notice ??
-    (stale
-      ? { text: 'Draft not read yet — Compare versions or Run pass.', at: 'draft' as NoticeAt }
-      : null)
-  const notePlace: NoticeAt | null = !deskNote
-    ? null
-    : screen === 'draft'
-      ? 'draft'
-      : deskNote.at === 'draft'
-        ? 'paper'
-        : deskNote.at
-  const noteText = deskNote?.text ?? null
-  const draftNote = notePlace === 'draft' ? noteText : null
-  const paperNote = notePlace === 'paper' ? noteText : null
-  const footNote = notePlace === 'foot' ? noteText : null
-  const dismissNote = useCallback(() => setNotice(null), [])
-  const toDraft = useCallback(() => setScreen('draft'), [])
-  const toMarks = useCallback(() => setScreen('marks'), [])
-  const head = {
-    title: session.document.title,
-    derivedTitle: session.document.derivedTitle,
-    byline: session.document.byline,
-    epigraph: session.document.epigraph,
-  }
-  const canReset =
-    session.originalMd.trim() !== '' || session.editedMd.trim() !== '' || marks.length > 0
-  const paperProps = {
-    marks: marksById,
-    markCount: marks.length,
-    openId,
-    focusedId: focusId,
-    where: render.whereOfMark,
-    onToggle: toggleSlip,
-    onDecide: decide,
-    onCloseSlip: closeSlip,
-    onboard,
-    sample: session.sample,
-    onDraft: toDraft,
-    notice: paperNote,
-    footNote,
-    onDismissNotice: notice ? dismissNote : undefined,
-    onExport: () => exportMd('foot'),
-    registerHost,
-    registerAnchor,
-  }
-  let sheet
-  if (screen === 'draft') {
-    sheet = (
-      <DraftSheet
-        sample={session.sample}
-        words={wordCount(session.originalMd)}
-        ready={ready}
-        canReset={canReset}
-        onStartOver={startOver}
-        onMarks={toMarks}
-      >
-        <Composer
-          originalMd={session.originalMd}
-          editedMd={session.editedMd}
-          onOriginal={setOriginal}
-          onEdited={setEdited}
-          onLoadExample={loadExample}
-          onCompare={compare}
-          onRunPass={() => void pass()}
-          busy={busy}
-          notice={draftNote}
-          marked={marks.length > 0}
-        />
-      </DraftSheet>
-    )
-  } else if (screen === 'split') {
-    sheet = <SplitSheet head={head} rows={splitRows} changed={changed} {...paperProps} />
-  } else if (screen === 'beats') {
-    sheet = (
-      <BeatsSheet
-        beats={render.flow}
-        typeOf={typeOf}
-        activeSection={activeSection}
-        onJump={jumpToBeat}
-        markCount={marks.length}
-        sample={session.sample}
-        notice={paperNote}
-        footNote={footNote}
-        onDismissNotice={notice ? dismissNote : undefined}
-        onExport={() => exportMd('foot')}
-      />
-    )
-  } else {
-    sheet = (
-      <EssaySheet
-        head={head}
-        sections={render.sections}
-        decisions={session.decisions}
-        mode={mode}
-        onMode={setMode}
-        empty={empty}
-        {...paperProps}
-      />
-    )
-  }
-  return (
-    <>
-      <div className="topstack" ref={topstack}>
-        <Chrome
-          title={session.title}
-          screen={screen}
-          onScreen={setScreen}
-          ready={ready}
-          layers={session.layers}
-          activeLayerId={session.activeLayerId}
-          onLayer={(id) => {
-            setOpenId(null)
-            setFocusId(null)
-            setSession((s) => ({ ...s, activeLayerId: id }))
-          }}
-          onExport={() => exportMd('paper')}
-        />
-        {ready && (screen === 'marks' || screen === 'split') ? (
-          <StatsBar
-            stats={stats}
-            filters={filters}
-            armed={openId !== null}
-            onFilters={setFilters}
-            onJumpType={jumpToType}
-            onKeepAll={() => bulk('accepted')}
-            onKeepMineAll={() => bulk('rejected')}
-            onUndo={undo}
-            canUndo={undoStack.length > 0}
-            shown={shown}
-          />
-        ) : null}
-      </div>
-      <div className="workspace">{sheet}</div>
-      <a ref={download} className="export-anchor" aria-hidden="true" tabIndex={-1}>
-        export
-      </a>
-    </>
-  )
-}
